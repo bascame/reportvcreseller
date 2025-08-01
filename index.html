@@ -85,6 +85,30 @@
                 <button id="logout-button" class="mt-4 md:mt-0 bg-red-500 text-white font-semibold py-2 px-5 rounded-lg hover:bg-red-600 transition-colors">Keluar</button>
             </header>
             <main class="space-y-8">
+                <!-- Bagian Kelola Reseller (Hanya untuk Admin) -->
+                <div id="reseller-management-section" class="bg-white shadow-lg rounded-2xl p-6 hidden">
+                    <h2 class="text-2xl font-bold mb-6 text-gray-800">Kelola Reseller</h2>
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <!-- Kolom Tambah Reseller -->
+                        <div>
+                            <h3 class="text-lg font-semibold mb-4 text-gray-700">Tambah Reseller Baru</h3>
+                            <form id="add-reseller-form" class="space-y-4">
+                                <div>
+                                    <label for="new-reseller-name" class="block text-sm font-medium text-gray-700 mb-1">Nama Reseller</label>
+                                    <input type="text" id="new-reseller-name" class="w-full px-4 py-3 bg-gray-100 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: Budi" required>
+                                </div>
+                                <button type="submit" class="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700 transition-colors">Tambah Reseller</button>
+                            </form>
+                        </div>
+                        <!-- Kolom Daftar Reseller -->
+                        <div>
+                            <h3 class="text-lg font-semibold mb-4 text-gray-700">Daftar Reseller Saat Ini</h3>
+                            <div id="reseller-list-container" class="max-h-60 overflow-y-auto pr-2 border rounded-lg p-2 bg-gray-50">
+                                <ul id="reseller-list" class="space-y-2"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <!-- Tabel Penjualan Mingguan -->
                 <div class="bg-white shadow-lg rounded-2xl p-6">
                     <h2 class="text-2xl font-bold mb-6 text-gray-800">Penjualan Mingguan</h2>
@@ -112,7 +136,7 @@
     <script type="module">
         // Import fungsi-fungsi yang diperlukan dari Firebase SDK
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc, deleteField } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         // --- KONFIGURASI FIREBASE ---
         // PASTIKAN ANDA SUDAH MENGGANTI INI DENGAN KONFIGURASI PROYEK ANDA
@@ -132,7 +156,7 @@
 
         // --- DATA DAN KONFIGURASI APLIKASI ---
         const adminCredentials = { email: 'edwin@dev.com', password: 'Edwin1895@' };
-        const resellerNames = ['Iyoh', 'Eko', 'Endih', 'Anggi', 'Iyul', 'Nina', 'Cibatok', 'Baim', 'Lia', 'Oces'];
+        const initialResellerNames = ['Iyoh', 'Eko', 'Endih', 'Anggi', 'Iyul', 'Nina', 'Cibatok', 'Baim', 'Lia', 'Oces']; // Hanya untuk inisialisasi awal
         let salesData = { weekly: {}, monthly: {} };
         let currentUser = null;
         let currentRole = null; // 'admin', 'reseller', atau 'visitor'
@@ -166,6 +190,10 @@
         const editVcInput = document.getElementById('edit-vc');
         const editFeePercentageInput = document.getElementById('edit-fee-percentage');
         const cancelEditButton = document.getElementById('cancel-edit');
+        const resellerManagementSection = document.getElementById('reseller-management-section');
+        const addResellerForm = document.getElementById('add-reseller-form');
+        const newResellerNameInput = document.getElementById('new-reseller-name');
+        const resellerList = document.getElementById('reseller-list');
 
         // --- FUNGSI-FUNGSI UTAMA ---
 
@@ -189,7 +217,9 @@
                 return `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="py-4 px-4 font-medium">${resellerName}</td><td class="py-4 px-4 text-sm text-gray-600">${startDate}</td><td class="py-4 px-4 text-sm text-gray-600">${endDate}</td><td class="py-4 px-4 text-right font-medium">${totalVC}</td><td class="py-4 px-4 text-right text-sm text-gray-600">${feePercentage.toFixed(1)}%</td><td class="py-4 px-4 text-right text-sm text-red-600 font-semibold">${adminFee.toFixed(2)}</td><td class="py-4 px-4 text-right text-sm text-green-600 font-semibold">${resellerFee.toFixed(2)}</td>${showActions ? `<td class="py-4 px-4 text-center"><button class="edit-btn bg-blue-100 text-blue-700 text-xs font-bold py-1 px-3 rounded-full hover:bg-blue-200" data-reseller="${resellerName}" data-type="${type}">Edit</button></td>` : '<td class="py-4 px-4"></td>'}</tr>`;
             };
 
-            const displayNames = (currentRole === 'admin' || currentRole === 'visitor') ? resellerNames : [currentUser];
+            const allResellers = salesData.weekly ? Object.keys(salesData.weekly).sort((a, b) => a.localeCompare(b)) : [];
+            // Sesuai permintaan sebelumnya, reseller bisa melihat semua data seperti visitor
+            const displayNames = (currentRole === 'admin' || currentRole === 'visitor' || currentRole === 'reseller') ? allResellers : [currentUser];
 
             displayNames.forEach(name => {
                 if (salesData.weekly[name]) {
@@ -221,7 +251,7 @@
             const lastDayOfWeek = formatDate(new Date(new Date().setDate(today.getDate() - dayOfWeek + 7))); // Sunday
 
             const initialData = { weekly: {}, monthly: {} };
-            resellerNames.forEach(name => {
+            initialResellerNames.forEach(name => {
                 initialData.weekly[name] = { startDate: firstDayOfWeek, endDate: lastDayOfWeek, totalVC: 0, feePercentage: 5.0 };
                 initialData.monthly[name] = { startDate: firstDayOfMonth, endDate: lastDayOfMonth, totalVC: 0, feePercentage: 5.0 };
             });
@@ -269,6 +299,83 @@
             }
         }
 
+        /**
+         * Merender daftar reseller di panel admin.
+         */
+        function renderResellerList() {
+            if (currentRole !== 'admin' || !salesData.weekly) return;
+            resellerList.innerHTML = '';
+            const allResellers = Object.keys(salesData.weekly).sort((a, b) => a.localeCompare(b));
+            if (allResellers.length === 0) {
+                resellerList.innerHTML = `<li class="text-sm text-gray-500">Belum ada reseller.</li>`;
+                return;
+            }
+            allResellers.forEach(name => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center bg-white p-2 rounded-md shadow-sm';
+                li.innerHTML = `<span class="font-medium text-sm">${name}</span><button class="delete-reseller-btn text-red-500 hover:text-red-700 text-xs font-bold py-1 px-2 rounded-full hover:bg-red-100" data-reseller-name="${name}">Hapus</button>`;
+                resellerList.appendChild(li);
+            });
+        }
+
+        /**
+         * Menangani penambahan reseller baru.
+         */
+        async function handleAddReseller(event) {
+            event.preventDefault();
+            const newName = newResellerNameInput.value.trim();
+            if (!newName) {
+                alert('Nama reseller tidak boleh kosong.');
+                return;
+            }
+
+            const allResellers = salesData.weekly ? Object.keys(salesData.weekly) : [];
+            if (allResellers.some(name => name.toLowerCase() === newName.toLowerCase())) {
+                alert('Nama reseller sudah ada.');
+                return;
+            }
+
+            const formatDate = (date) => date.toISOString().split('T')[0];
+            const today = new Date();
+            const firstDayOfMonth = formatDate(new Date(today.getFullYear(), today.getMonth(), 1));
+            const lastDayOfMonth = formatDate(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+            const dayOfWeek = today.getDay();
+            const firstDayOfWeek = formatDate(new Date(new Date().setDate(today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1))));
+            const lastDayOfWeek = formatDate(new Date(new Date().setDate(today.getDate() - dayOfWeek + 7)));
+
+            const newResellerData = {
+                [`weekly.${newName}`]: { startDate: firstDayOfWeek, endDate: lastDayOfWeek, totalVC: 0, feePercentage: 5.0 },
+                [`monthly.${newName}`]: { startDate: firstDayOfMonth, endDate: lastDayOfMonth, totalVC: 0, feePercentage: 5.0 }
+            };
+
+            try {
+                await updateDoc(salesDocRef, newResellerData);
+                newResellerNameInput.value = ''; // Kosongkan input setelah berhasil
+            } catch (error) {
+                console.error("Error adding new reseller: ", error);
+                alert("Gagal menambahkan reseller baru.");
+            }
+        }
+
+        /**
+         * Menangani penghapusan reseller.
+         */
+        async function handleDeleteReseller(event) {
+            if (!event.target.classList.contains('delete-reseller-btn')) return;
+            const resellerToDelete = event.target.dataset.resellerName;
+            if (confirm(`Apakah Anda yakin ingin menghapus reseller "${resellerToDelete}"? Semua data penjualannya juga akan terhapus.`)) {
+                try {
+                    await updateDoc(salesDocRef, {
+                        [`weekly.${resellerToDelete}`]: deleteField(),
+                        [`monthly.${resellerToDelete}`]: deleteField()
+                    });
+                } catch (error) {
+                    console.error("Error deleting reseller: ", error);
+                    alert("Gagal menghapus reseller.");
+                }
+            }
+        }
+
         // --- Fungsi UI Lainnya (Login, Logout, Modal, dll) ---
         function showDashboard() {
             if (currentRole === 'admin') {
@@ -282,6 +389,11 @@
                 welcomeSubheading.textContent = 'Anda melihat data dalam mode hanya-baca.';
             }
 
+            if (currentRole === 'admin') {
+                resellerManagementSection.classList.remove('hidden');
+                renderResellerList();
+            }
+
             renderTables();
             loginPage.classList.add('hidden');
             dashboardPage.classList.remove('hidden');
@@ -293,6 +405,7 @@
             usernameInput.value = '';
             passwordInput.value = '';
             loginError.classList.add('hidden');
+            resellerManagementSection.classList.add('hidden');
             dashboardPage.classList.add('hidden');
             initialLoading.classList.add('hidden');
             loginPage.classList.remove('hidden');
@@ -311,7 +424,8 @@
                 return;
             }
 
-            const resellerMatch = resellerNames.find(name => name.toLowerCase() === username.toLowerCase());
+            const allResellers = salesData.weekly ? Object.keys(salesData.weekly) : [];
+            const resellerMatch = allResellers.find(name => name.toLowerCase() === username.toLowerCase());
             if (resellerMatch) {
                 currentUser = resellerMatch;
                 currentRole = 'reseller';
@@ -353,6 +467,8 @@
         loginForm.addEventListener('submit', handleLogin);
         logoutButton.addEventListener('click', handleLogout);
         togglePasswordVisibilityButton.addEventListener('click', togglePasswordVisibility);
+        addResellerForm.addEventListener('submit', handleAddReseller);
+        resellerList.addEventListener('click', handleDeleteReseller);
         
         visitorLoginBtn.addEventListener('click', () => {
             currentUser = 'Pengunjung';
@@ -403,6 +519,9 @@
                 salesData = doc.data();
                 if (currentUser) {
                     renderTables();
+                    if (currentRole === 'admin') {
+                        renderResellerList();
+                    }
                 }
             } else {
                 console.log("No such document! Creating initial data...");

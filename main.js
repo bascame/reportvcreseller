@@ -203,16 +203,18 @@ async function handleSaveChanges(event) {
         newVouchersSold[voucherName] = parseInt(input.value, 10) || 0;
     }
 
-    const updatedData = { ...salesData };
-    updatedData[type][reseller] = {
-        startDate: editStartDateInput.value,
-        endDate: editEndDateInput.value,
-        feePercentage: parseFloat(editFeePercentageInput.value),
-        vouchersSold: newVouchersSold
+    // Siapkan data yang akan diupdate menggunakan notasi titik untuk field bersarang.
+    // Ini memastikan hanya field yang relevan yang akan diubah.
+    const dataToUpdate = {
+        [`${type}.${reseller}.startDate`]: editStartDateInput.value,
+        [`${type}.${reseller}.endDate`]: editEndDateInput.value,
+        [`${type}.${reseller}.feePercentage`]: parseFloat(editFeePercentageInput.value),
+        [`${type}.${reseller}.vouchersSold`]: newVouchersSold
     };
 
     try {
-        await setDoc(salesDocRef, updatedData);
+        // Gunakan updateDoc untuk hanya mengubah data reseller yang spesifik, bukan menimpa seluruh dokumen.
+        await updateDoc(salesDocRef, dataToUpdate);
         closeEditModal();
     } catch (error) {
         console.error("Error updating document: ", error);
@@ -247,6 +249,14 @@ async function handleAddReseller(event) {
     const newName = newResellerNameInput.value.trim();
     if (!newName) {
         alert('Nama reseller tidak boleh kosong.');
+        return;
+    }
+
+    // Validasi untuk karakter yang tidak diizinkan di nama field Firestore
+    const invalidCharRegex = /[.\/*\[\]]/;
+    if (invalidCharRegex.test(newName)) {
+        alert('Nama reseller tidak boleh mengandung karakter spesial seperti ., /, *, [, atau ].');
+        newResellerNameInput.focus(); // Fokus kembali ke input
         return;
     }
 

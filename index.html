@@ -222,19 +222,6 @@
         const downloadWeeklyCsvButton = document.getElementById('download-weekly-csv');
         const downloadMonthlyCsvButton = document.getElementById('download-monthly-csv');
 
-        // --- FUNGSI-FUNGSI BANTU ---
-        /**
-         * Memformat objek Date menjadi string 'YYYY-MM-DD'.
-         * @param {Date} date Objek tanggal yang akan diformat.
-         * @returns {string} String tanggal yang diformat.
-         */
-        const formatDate = (date) => {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        };
-
         // --- FUNGSI-FUNGSI UTAMA ---
 
         /**
@@ -300,6 +287,13 @@
          * Menginisialisasi data di Firestore jika belum ada.
          */
         async function initializeDataInFirestore() {
+            const formatDate = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
             const today = new Date();
             const firstDayOfMonth = formatDate(new Date(today.getFullYear(), today.getMonth(), 1));
             const lastDayOfMonth = formatDate(new Date(today.getFullYear(), today.getMonth() + 1, 0));
@@ -322,46 +316,6 @@
                 console.error("Error creating initial data: ", error);
                 alert("Gagal membuat data awal di server.");
             }
-        }
-
-        /**
-         * Menyiapkan data reset mingguan untuk reseller tertentu jika kondisinya terpenuhi.
-         * @returns {Object} Objek berisi pembaruan untuk Firestore, atau objek kosong jika tidak ada reset.
-         */
-        function getWeeklyResetUpdates() {
-            const today = new Date();
-            // Fungsi ini hanya berjalan pada hari Sabtu (getDay() === 6)
-            if (today.getDay() !== 6) {
-                return {};
-            }
-
-            const resellersToReset = ['Lia', 'Nina'];
-            const updates = {};
-            const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
-            resellersToReset.forEach(resellerName => {
-                const weeklyData = salesData.weekly[resellerName];
-                if (!weeklyData) {
-                    return; // Lewati jika reseller tidak ada datanya
-                }
-
-                const currentEndDate = new Date(weeklyData.endDate);
-
-                // Reset jika hari ini (Sabtu) telah melewati tanggal akhir periode mingguan saat ini
-                if (todayDateOnly > currentEndDate) {
-                    // Hitung periode minggu berikutnya (Senin sampai Minggu)
-                    const nextMonday = new Date(today);
-                    nextMonday.setDate(today.getDate() + 2); // Sabtu + 2 hari = Senin
-
-                    const nextSunday = new Date(nextMonday);
-                    nextSunday.setDate(nextMonday.getDate() + 6); // Senin + 6 hari = Minggu
-
-                    // Siapkan data baru untuk diupdate
-                    updates[`weekly.${resellerName}`] = { ...weeklyData, totalVC: 0, startDate: formatDate(nextMonday), endDate: formatDate(nextSunday) };
-                }
-            });
-
-            return updates;
         }
 
         /**
@@ -593,6 +547,18 @@
         }
 
         // --- Fungsi UI Lainnya (Login, Logout, Modal, dll) ---
+        function restoreSession() {
+            const storedUser = sessionStorage.getItem('currentUser');
+            const storedRole = sessionStorage.getItem('currentRole');
+            if (storedUser && storedRole) {
+                currentUser = storedUser;
+                currentRole = storedRole;
+                console.log('Sesi dipulihkan untuk:', currentUser, 'dengan peran:', currentRole);
+            } else {
+                console.log('Tidak ada sesi aktif yang ditemukan.');
+            }
+        }
+
         function showDashboard() {
             if (currentRole === 'admin') {
                 welcomeHeading.textContent = `Dasbor Admin`;
@@ -637,6 +603,8 @@
             if (username.toLowerCase() === adminCredentials.email && password === adminCredentials.password) {
                 currentUser = adminCredentials.email;
                 currentRole = 'admin';
+                sessionStorage.setItem('currentUser', currentUser);
+                sessionStorage.setItem('currentRole', currentRole);
                 showDashboard();
                 return;
             }
@@ -646,6 +614,8 @@
             if (resellerMatch) {
                 currentUser = resellerMatch;
                 currentRole = 'reseller';
+                sessionStorage.setItem('currentUser', currentUser);
+                sessionStorage.setItem('currentRole', currentRole);
                 showDashboard();
                 return;
             }
@@ -654,7 +624,12 @@
             loginError.classList.remove('hidden');
         }
         
-        function handleLogout() { showLoginPage(); }
+        function handleLogout() {
+            sessionStorage.removeItem('currentUser');
+            sessionStorage.removeItem('currentRole');
+            console.log('Sesi telah dihapus.');
+            showLoginPage();
+        }
         
         function openEditModal(reseller, type) {
             editingContext = { reseller, type };
@@ -692,6 +667,7 @@
         visitorLoginBtn.addEventListener('click', () => {
             currentUser = 'Pengunjung';
             currentRole = 'visitor';
+            // Pengunjung tidak disimpan di session storage agar selalu mulai dari awal
             showDashboard();
         });
 
@@ -732,47 +708,20 @@
         // Ini cocok untuk pengembangan, tetapi TIDAK AMAN untuk produksi.
         // ===================================================================================
 
+        restoreSession(); // Memulihkan sesi sebelum mengambil data
+
         onSnapshot(salesDocRef, async (doc) => {
             console.log("Data received from Firestore.");
             if (doc.exists()) {
                 salesData = doc.data();
-
-                // Cek dan siapkan pembaruan reset mingguan jika diperlukan
-                const updates = getWeeklyResetUpdates();
-                if (Object.keys(updates).length > 0) {
-                    console.log("Menerapkan reset mingguan otomatis untuk:", Object.keys(updates).map(k => k.split('.')[1]));
-                    
-                    // Terapkan pembaruan ke Firestore di latar belakang
-                    updateDoc(salesDocRef, updates).then(() => {
-                        if (currentRole === 'admin') {
-                            // Beri tahu admin setelah berhasil disimpan
-                            alert('Data penjualan mingguan untuk Lia dan Nina telah direset secara otomatis.');
-                        }
-                    }).catch(error => {
-                        console.error("Error applying weekly reset:", error);
-                        alert("Gagal melakukan reset data mingguan otomatis.");
-                    });
-
-                    // Gabungkan pembaruan ke data lokal untuk pembaruan UI instan
-                    Object.keys(updates).forEach(key => {
-                        const [type, reseller] = key.split('.');
-                        if (salesData[type] && salesData[type][reseller]) { salesData[type][reseller] = updates[key]; }
-                    });
-                }
-
-                if (currentUser) {
-                    renderTables();
-                    renderWeeklySalesChart();
-                    if (currentRole === 'admin') {
-                        renderResellerList();
-                    }
-                }
             } else {
                 console.log("No such document! Creating initial data...");
                 await initializeDataInFirestore();
             }
-            // Tampilkan halaman login setelah data siap
-            if (!currentUser) {
+            // Setelah data siap, tentukan halaman yang akan ditampilkan
+            if (currentUser) {
+                showDashboard();
+            } else {
                 showLoginPage();
             }
         }, (error) => {

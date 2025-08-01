@@ -479,6 +479,12 @@ document.addEventListener('DOMContentLoaded', () => {
         editEndDateInput.value = data.endDate;
         editFeePercentageInput.value = data.feePercentage;
 
+        if (!voucherInputsContainer) {
+            console.error("DOM element with ID 'voucher-inputs-container' not found. Cannot populate edit modal.");
+            alert("Gagal memuat konten modal edit. Elemen yang diperlukan tidak ada di halaman.");
+            return;
+        }
+
         voucherInputsContainer.innerHTML = '';
         for (const voucherName in VOUCHER_LIST) {
             const price = VOUCHER_LIST[voucherName];

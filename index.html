@@ -127,7 +127,7 @@
                             <span>Unduh CSV</span>
                         </button>
                     </div>
-                    <div class="overflow-x-auto"><table class="w-full text-left min-w-[900px]"><thead class="border-b-2 border-gray-200"><tr><th class="py-3 px-4 font-semibold text-sm text-gray-600">Reseller</th><th class="py-3 px-4 font-semibold text-sm text-gray-600">Mulai Tanggal</th><th class="py-3 px-4 font-semibold text-sm text-gray-600">Sampai Tanggal</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Total VC</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Fee (%)</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Fee Admin</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Fee Reseller</th><th id="action-header-weekly" class="py-3 px-4 font-semibold text-sm text-gray-600 text-center">Aksi</th></tr></thead><tbody id="weekly-sales-body"></tbody></table></div>
+                    <div class="overflow-x-auto"><table class="w-full text-left min-w-[900px]"><thead class="border-b-2 border-gray-200"><tr><th class="py-3 px-4 font-semibold text-sm text-gray-600">Reseller</th><th class="py-3 px-4 font-semibold text-sm text-gray-600">Mulai Tanggal</th><th class="py-3 px-4 font-semibold text-sm text-gray-600">Sampai Tanggal</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Total VC</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Fee (%)</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Fee Admin</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Fee Reseller</th><th id="action-header-weekly" class="py-3 px-4 font-semibold text-sm text-gray-600 text-center">Aksi</th></tr></thead><tbody id="weekly-sales-body"></tbody><tfoot id="weekly-sales-foot"></tfoot></table></div>
                 </div>
                 <!-- Tabel Penjualan Bulanan -->
                 <div class="bg-white shadow-lg rounded-2xl p-6">
@@ -138,7 +138,7 @@
                             <span>Unduh CSV</span>
                         </button>
                     </div>
-                    <div class="overflow-x-auto"><table class="w-full text-left min-w-[900px]"><thead class="border-b-2 border-gray-200"><tr><th class="py-3 px-4 font-semibold text-sm text-gray-600">Reseller</th><th class="py-3 px-4 font-semibold text-sm text-gray-600">Mulai Tanggal</th><th class="py-3 px-4 font-semibold text-sm text-gray-600">Sampai Tanggal</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Total VC</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Fee (%)</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Fee Admin</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Fee Reseller</th><th id="action-header-monthly" class="py-3 px-4 font-semibold text-sm text-gray-600 text-center">Aksi</th></tr></thead><tbody id="monthly-sales-body"></tbody></table></div>
+                    <div class="overflow-x-auto"><table class="w-full text-left min-w-[900px]"><thead class="border-b-2 border-gray-200"><tr><th class="py-3 px-4 font-semibold text-sm text-gray-600">Reseller</th><th class="py-3 px-4 font-semibold text-sm text-gray-600">Mulai Tanggal</th><th class="py-3 px-4 font-semibold text-sm text-gray-600">Sampai Tanggal</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Total VC</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Fee (%)</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Fee Admin</th><th class="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Fee Reseller</th><th id="action-header-monthly" class="py-3 px-4 font-semibold text-sm text-gray-600 text-center">Aksi</th></tr></thead><tbody id="monthly-sales-body"></tbody><tfoot id="monthly-sales-foot"></tfoot></table></div>
                 </div>
             </main>
         </div>
@@ -200,7 +200,9 @@
         const welcomeSubheading = document.getElementById('welcome-subheading');
         const logoutButton = document.getElementById('logout-button');
         const weeklySalesBody = document.getElementById('weekly-sales-body');
+        const weeklySalesFoot = document.getElementById('weekly-sales-foot');
         const monthlySalesBody = document.getElementById('monthly-sales-body');
+        const monthlySalesFoot = document.getElementById('monthly-sales-foot');
         const actionHeaderWeekly = document.getElementById('action-header-weekly');
         const actionHeaderMonthly = document.getElementById('action-header-monthly');
         const editModal = document.getElementById('edit-modal');
@@ -230,6 +232,8 @@
 
             weeklySalesBody.innerHTML = '';
             monthlySalesBody.innerHTML = '';
+            weeklySalesFoot.innerHTML = '';
+            monthlySalesFoot.innerHTML = '';
             
             const showActions = (currentRole === 'admin');
             actionHeaderWeekly.style.display = showActions ? '' : 'none';
@@ -245,15 +249,38 @@
             const allResellers = salesData.weekly ? Object.keys(salesData.weekly).sort((a, b) => a.localeCompare(b)) : [];
             // Sesuai permintaan sebelumnya, reseller bisa melihat semua data seperti visitor
             const displayNames = (currentRole === 'admin' || currentRole === 'visitor' || currentRole === 'reseller') ? allResellers : [currentUser];
-
+            
+            let weeklyTotalVC = 0, weeklyTotalAdminFee = 0, weeklyTotalResellerFee = 0;
+            let monthlyTotalVC = 0, monthlyTotalAdminFee = 0, monthlyTotalResellerFee = 0;
+            
             displayNames.forEach(name => {
                 if (salesData.weekly[name]) {
                     weeklySalesBody.innerHTML += renderRow(name, salesData.weekly[name], 'weekly');
+                    const { totalVC, feePercentage } = salesData.weekly[name];
+                    const adminFee = totalVC * (feePercentage / 100);
+                    weeklyTotalVC += totalVC;
+                    weeklyTotalAdminFee += adminFee;
+                    weeklyTotalResellerFee += (totalVC - adminFee);
                 }
                 if (salesData.monthly[name]) {
                     monthlySalesBody.innerHTML += renderRow(name, salesData.monthly[name], 'monthly');
+                    const { totalVC, feePercentage } = salesData.monthly[name];
+                    const adminFee = totalVC * (feePercentage / 100);
+                    monthlyTotalVC += totalVC;
+                    monthlyTotalAdminFee += adminFee;
+                    monthlyTotalResellerFee += (totalVC - adminFee);
                 }
             });
+
+            const renderFooterRow = (totalVC, totalAdminFee, totalResellerFee) => {
+                const actionCols = showActions ? '<td></td>' : '<td></td>';
+                return `<tr class="border-t-2 border-gray-300 bg-gray-50 font-bold"><td class="py-3 px-4" colspan="3">TOTAL</td><td class="py-3 px-4 text-right">${totalVC}</td><td class="py-3 px-4"></td><td class="py-3 px-4 text-right text-red-700">${totalAdminFee.toFixed(2)}</td><td class="py-3 px-4 text-right text-green-700">${totalResellerFee.toFixed(2)}</td>${actionCols}</tr>`;
+            };
+
+            if (displayNames.length > 0) {
+                weeklySalesFoot.innerHTML = renderFooterRow(weeklyTotalVC, weeklyTotalAdminFee, weeklyTotalResellerFee);
+                monthlySalesFoot.innerHTML = renderFooterRow(monthlyTotalVC, monthlyTotalAdminFee, monthlyTotalResellerFee);
+            }
         }
 
         /**
@@ -476,6 +503,9 @@
                 "Fee Reseller"
             ];
 
+            let totalVC = 0;
+            let totalAdminFee = 0;
+            let totalResellerFee = 0;
             const rows = Object.keys(dataToExport).sort((a, b) => a.localeCompare(b)).map(resellerName => {
                 const data = dataToExport[resellerName];
                 const { startDate, endDate, totalVC, feePercentage } = data;
@@ -483,13 +513,22 @@
                 const resellerFee = totalVC - adminFee;
 
                 return [
-                    resellerName, startDate, endDate, totalVC,
+                    `"${resellerName}"`, startDate, endDate, totalVC,
                     feePercentage.toFixed(1), adminFee.toFixed(2), resellerFee.toFixed(2)
                 ].join(',');
             });
 
+            // Hitung total untuk baris ringkasan
+            Object.values(dataToExport).forEach(data => {
+                const adminFee = data.totalVC * (data.feePercentage / 100);
+                totalVC += data.totalVC;
+                totalAdminFee += adminFee;
+                totalResellerFee += (data.totalVC - adminFee);
+            });
+            const summaryRow = `\n"TOTAL",,,${totalVC},,${totalAdminFee.toFixed(2)},${totalResellerFee.toFixed(2)}`;
+
             // Gabungkan header dan baris data
-            const csvString = [headers.join(','), ...rows].join('\n');
+            const csvString = [headers.join(','), ...rows].join('\n') + summaryRow;
 
             // Buat Blob dari string CSV
             const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });

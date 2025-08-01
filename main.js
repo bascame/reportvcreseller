@@ -76,6 +76,55 @@ const voucherListContainer = document.getElementById('voucher-list-container');
 // --- FUNGSI-FUNGSI UTAMA ---
 
 /**
+ * **SOLUSI:** Membersihkan dan menormalkan data dari Firestore.
+ * Fungsi ini memastikan setiap entri penjualan memiliki semua field yang diperlukan.
+ * @param {object} data - Data mentah dari Firestore.
+ * @returns {object} Data yang sudah bersih dan konsisten.
+ */
+function normalizeData(data) {
+    const defaultVoucher = Object.keys(voucherOptions)[0];
+    const defaultPrice = voucherOptions[defaultVoucher];
+    const defaultFee = 5.0;
+
+    const today = new Date();
+    const formatDate = (date) => date.toISOString().split('T')[0];
+    const firstDayOfWeek = formatDate(new Date(today.setDate(today.getDate() - today.getDay() + 1)));
+    const lastDayOfWeek = formatDate(new Date(today.setDate(today.getDate() - today.getDay() + 7)));
+
+    // Pastikan data memiliki properti 'weekly' dan 'monthly'
+    if (!data.weekly) data.weekly = {};
+    if (!data.monthly) data.monthly = {};
+    
+    // Periksa setiap reseller di data mingguan dan bulanan
+    const allResellerNames = [...new Set([...Object.keys(data.weekly), ...Object.keys(data.monthly)])];
+
+    for (const resellerName of allResellerNames) {
+        // Normalisasi data mingguan
+        const weeklyEntry = data.weekly[resellerName] || {};
+        data.weekly[resellerName] = {
+            voucherType: weeklyEntry.voucherType || defaultVoucher,
+            totalVC: typeof weeklyEntry.totalVC === 'number' ? weeklyEntry.totalVC : (voucherOptions[weeklyEntry.voucherType] || defaultPrice),
+            feePercentage: typeof weeklyEntry.feePercentage === 'number' ? weeklyEntry.feePercentage : defaultFee,
+            startDate: weeklyEntry.startDate || firstDayOfWeek,
+            endDate: weeklyEntry.endDate || lastDayOfWeek,
+        };
+        
+        // Normalisasi data bulanan
+        const monthlyEntry = data.monthly[resellerName] || {};
+        data.monthly[resellerName] = {
+            voucherType: monthlyEntry.voucherType || defaultVoucher,
+            totalVC: typeof monthlyEntry.totalVC === 'number' ? monthlyEntry.totalVC : (voucherOptions[monthlyEntry.voucherType] || defaultPrice),
+            feePercentage: typeof monthlyEntry.feePercentage === 'number' ? monthlyEntry.feePercentage : defaultFee,
+            startDate: monthlyEntry.startDate || formatDate(new Date(today.getFullYear(), today.getMonth(), 1)),
+            endDate: monthlyEntry.endDate || formatDate(new Date(today.getFullYear(), today.getMonth() + 1, 0)),
+        };
+    }
+    
+    return data;
+}
+
+
+/**
  * Merender daftar voucher yang tersedia di dasbor.
  */
 function renderVoucherList() {
@@ -107,7 +156,7 @@ function renderTables() {
     actionHeaderMonthly.style.display = showActions ? '' : 'none';
 
     const renderRow = (resellerName, data, type) => {
-        const { startDate, endDate, voucherType = '6 Jam', totalVC, feePercentage } = data;
+        const { startDate, endDate, voucherType, totalVC, feePercentage } = data;
         const adminFee = totalVC * (feePercentage / 100);
         const resellerFee = totalVC - adminFee;
         return `
@@ -554,13 +603,18 @@ restoreSession();
 
 onSnapshot(salesDocRef, async (doc) => {
     console.log("Data received from Firestore.");
+    let rawData;
     if (doc.exists()) {
-        salesData = doc.data();
+        rawData = doc.data();
     } else {
         console.log("No such document! Creating initial data...");
         await initializeDataInFirestore();
+        rawData = salesData; // Use the newly created initial data
     }
     
+    // **PERBAIKAN UTAMA:** Normalisasi data setiap kali data diterima dari server
+    salesData = normalizeData(rawData);
+
     if (currentUser) {
         showDashboard();
     } else {

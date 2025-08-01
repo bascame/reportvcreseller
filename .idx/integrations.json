@@ -1,5 +1,6 @@
 {
   "firebase_hosting": {
     "deploymentHostingUrl": "https://reportvoucherreseller.web.app"
-  }
+  },
+  "gemini_api": {}
 }
